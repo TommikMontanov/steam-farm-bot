@@ -11,6 +11,10 @@ import logging
 # Настройка логирования
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
+# Диагностика путей
+logging.info(f"Current directory: {os.getcwd()}")
+logging.info(f"Config directory contents: {os.listdir('config') if os.path.exists('config') else 'No config folder'}")
+
 # Получение переменных окружения
 API_TOKEN = os.getenv("BOT_TOKEN")
 ASF_API_URL = os.getenv("ASF_API_URL")
@@ -94,7 +98,7 @@ async def asf_request(endpoint, method="GET", data=None):
 
 # Функция ожидания готовности ASF API
 async def wait_for_asf():
-    max_attempts = 30  # Увеличено с 15 до 30
+    max_attempts = 30
     url = f"{ASF_API_URL}/Api"
     headers = {"Authentication": ASF_API_KEY}
     logging.info(f"Attempting to connect to ASF API at {url} with ASF_API_KEY={ASF_API_KEY}")
@@ -116,7 +120,7 @@ async def wait_for_asf():
         except Exception as e:
             logging.error(f"Unexpected error: {e}")
         attempt += 1
-        await asyncio.sleep(5)  # Уменьшено с 10 до 5 секунд
+        await asyncio.sleep(5)
     raise RuntimeError(f"ASF API did not become available after {max_attempts} attempts")
 
 # Обработчик команды /start
@@ -145,7 +149,7 @@ async def cmd_register(message: types.Message):
 @dp.message()
 async def process_registration(message: types.Message):
     if not message.text:
-        return  # Игнорируем сообщения без текста
+        return
 
     user_id = message.from_user.id
     logging.info(f"Получено сообщение от пользователя {user_id}: {message.text}")
@@ -176,7 +180,6 @@ async def process_registration(message: types.Message):
         bot_name = f"Bot_{user_id}"
 
         logging.info(f"Отправка конфигурации ASF для бота {bot_name}")
-        # Создаем конфигурацию для ASF
         bot_config = {
             "Enabled": True,
             "SteamLogin": login,
@@ -189,13 +192,11 @@ async def process_registration(message: types.Message):
         if steamguard_code.lower() != "нет":
             bot_config["TwoFactorCode"] = steamguard_code
 
-        # Отправляем команду !addbot в ASF
         data = {
             "Command": f"!addbot {bot_name} {json.dumps(bot_config)}"
         }
         result = await asf_request("Api/Command", method="POST", data=data)
         if result and result.get("Success"):
-            # Получаем Steam ID после успешной регистрации
             bot_info = await asf_request(f"Api/Bot/{bot_name}")
             if bot_info and bot_info.get("Success"):
                 steam_id = bot_info.get("Result", {}).get(bot_name, {}).get("SteamID")
@@ -252,14 +253,12 @@ async def cmd_start_farm(message: types.Message):
         conn.close()
         return
 
-    # Проверяем статус фарма
     cursor.execute("SELECT farming FROM users WHERE user_id = ?", (user_id,))
     if cursor.fetchone()[0]:
         await message.answer("Фарм уже запущен!")
         conn.close()
         return
 
-    # Запускаем фарм через ASF
     data = {
         "Command": f"!start {bot_name} {selected_games}"
     }
