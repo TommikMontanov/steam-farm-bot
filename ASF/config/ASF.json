@@ -8,7 +8,7 @@
   "AutoRestart": true,
   "Headless": true,
   "IPC": true,
-  "IPCPassword": "mysecret123",
+  "IPCPassword": null,
   "Debug": true
   "IPC": true,
   "Debug": true
