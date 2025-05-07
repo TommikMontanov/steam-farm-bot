@@ -1,6 +1,6 @@
 {
-  "SteamLogin": "steam_user",
-  "SteamPassword": "steam_password",
+  "SteamLogin": ,
+  "SteamPassword": ,
   "Enabled": true,
   "BotBehaviour": 0,
   "SteamUserPermissions": {
