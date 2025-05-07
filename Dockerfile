@@ -20,7 +20,7 @@ RUN wget https://github.com/JustArchiNET/ArchiSteamFarm/releases/download/5.5.0.
     && rm ASF-generic.zip
 
 # Copy the bot and configuration files into the container
-COPY telegram_bot.py /app/
+COPY main.py /app/
 COPY ASF.json /app/ASF/config/
 
 # Set the proper permissions
@@ -28,4 +28,4 @@ RUN chmod +x /app/ASF/ArchiSteamFarm \
     && chmod -R 777 /app/ASF/config/
 
 # Set the command to run the bot and ASF
-CMD /app/ASF/ArchiSteamFarm & python3 /app/telegram_bot.py
+CMD /app/ASF/ArchiSteamFarm & python3 /app/main.py
