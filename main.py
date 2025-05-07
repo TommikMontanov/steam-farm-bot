@@ -4,7 +4,7 @@ import aiohttp
 import os
 import json
 from aiogram import Bot, Dispatcher, types
-from aiogram.filters import Command, Text
+from aiogram.filters import Command
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
 import logging
 
@@ -96,8 +96,11 @@ async def cmd_register(message: types.Message):
     await message.answer("Введи свой Steam логин:")
 
 # Обработчик текстовых сообщений для регистрации
-@dp.message(Text)
+@dp.message()
 async def process_registration(message: types.Message):
+    if not message.text:
+        return  # Игнорируем сообщения без текста
+
     user_id = message.from_user.id
     logging.info(f"Получено сообщение от пользователя {user_id}: {message.text}")
     
