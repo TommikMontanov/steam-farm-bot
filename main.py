@@ -4,12 +4,12 @@ import aiohttp
 import os
 import json
 from aiogram import Bot, Dispatcher, types
-from aiogram.filters import Command
+from aiogram.filters import Command, Text
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
 import logging
 
 # Настройка логирования
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 # Получение переменных окружения
 API_TOKEN = os.getenv("BOT_TOKEN")
@@ -76,6 +76,7 @@ async def asf_request(endpoint, method="GET", data=None):
 # Обработчик команды /start
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message):
+    logging.info(f"Получена команда /start от пользователя {message.from_user.id}")
     await message.answer(
         "Привет! Я бот для фарма часов в Steam. Используй команды:\n"
         "/register - Зарегистрировать Steam-аккаунт\n"
@@ -90,17 +91,24 @@ async def cmd_start(message: types.Message):
 @dp.message(Command("register"))
 async def cmd_register(message: types.Message):
     user_id = message.from_user.id
+    logging.info(f"Начало регистрации для пользователя {user_id}")
     registration_data[user_id] = {"step": "login"}
     await message.answer("Введи свой Steam логин:")
 
-# Обработчик шагов регистрации
+# Обработчик текстовых сообщений для регистрации
+@dp.message(Text)
 async def process_registration(message: types.Message):
     user_id = message.from_user.id
+    logging.info(f"Получено сообщение от пользователя {user_id}: {message.text}")
+    
     if user_id not in registration_data:
+        logging.warning(f"Пользователь {user_id} не в процессе регистрации")
         await message.answer("Начни регистрацию с /register!")
         return
 
     step = registration_data[user_id]["step"]
+    logging.info(f"Текущий шаг регистрации для {user_id}: {step}")
+
     if step == "login":
         registration_data[user_id]["login"] = message.text.strip()
         registration_data[user_id]["step"] = "password"
@@ -118,6 +126,7 @@ async def process_registration(message: types.Message):
         password = registration_data[user_id]["password"]
         bot_name = f"Bot_{user_id}"
 
+        logging.info(f"Отправка конфигурации ASF для бота {bot_name}")
         # Создаем конфигурацию для ASF
         bot_config = {
             "Enabled": True,
@@ -154,11 +163,14 @@ async def process_registration(message: types.Message):
                     conn.close()
                     await message.answer(f"Регистрация успешна! Steam ID: {steam_id}. Теперь выбери игры с помощью /select_games!")
                 else:
+                    logging.error(f"Не удалось получить Steam ID для {bot_name}")
                     await message.answer("Не удалось получить Steam ID. Проверь настройки ASF.")
             else:
+                logging.error(f"Ошибка получения данных бота {bot_name}")
                 await message.answer("Ошибка при получении данных бота. Проверь ASF.")
         else:
             error_msg = result.get("Message", "Неизвестная ошибка") if result else "Ошибка связи с ASF"
+            logging.error(f"Ошибка регистрации для {user_id}: {error_msg}")
             await message.answer(f"Ошибка регистрации: {error_msg}. Попробуй снова или проверь Steam Guard.")
             if "Steam Guard" in error_msg:
                 registration_data[user_id]["step"] = "steamguard"
@@ -167,12 +179,13 @@ async def process_registration(message: types.Message):
 
         # Очищаем временные данные
         del registration_data[user_id]
-        dp.message_handlers.unregister(process_registration)
+        logging.info(f"Регистрация завершена для пользователя {user_id}")
 
 # Обработчик команды /start_farm
 @dp.message(Command("start_farm"))
 async def cmd_start_farm(message: types.Message):
     user_id = message.from_user.id
+    logging.info(f"Команда /start_farm от пользователя {user_id}")
     conn = sqlite3.connect("users.db")
     cursor = conn.cursor()
     cursor.execute("SELECT steam_id, selected_games, bot_name FROM users WHERE user_id = ?", (user_id,))
@@ -211,6 +224,7 @@ async def cmd_start_farm(message: types.Message):
 
 # Запуск бота
 async def main():
+    logging.info("Запуск бота...")
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
