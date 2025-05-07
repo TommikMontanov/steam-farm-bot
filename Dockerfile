@@ -1,4 +1,8 @@
 from mcr.microsoft.com/dotnet/runtime:8.0
+RUN wget https://github.com/JustArchiNET/ArchiSteamFarm/releases/latest/download/ASF-generic.zip 
+&& [ -f ASF-generic.zip ] || exit 1 
+&& unzip ASF-generic.zip -d ASF 
+&& rm ASF-generic.zip
 RUN apt-get update && apt-get install -y 
 python3 
 python3-pip 
