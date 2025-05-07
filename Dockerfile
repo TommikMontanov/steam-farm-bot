@@ -15,8 +15,8 @@ RUN apt-get update && apt-get install -y \
 RUN pip3 install aiogram aiohttp
 
 # Download and extract ASF
-RUN wget https://github.com/JustArchiNET/ArchiSteamFarm/releases/download/5.5.0.11/ASF-linux-x64.zip 
-    && unzip ASF-linux-x64.zip -d ASF 
+RUN wget https://github.com/JustArchiNET/ArchiSteamFarm/releases/download/5.5.0.11/ASF-linux-x64.zip \
+    && unzip ASF-linux-x64.zip -d ASF \
     && rm ASF-linux-x64.zip
 
 # Copy the bot and configuration files into the container
