@@ -13,7 +13,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 
 # Получение переменных окружения
 API_TOKEN = os.getenv("BOT_TOKEN")
-ASF_API_URL = os.getenv("ASF_API_URL", "http://0.0.0.0:1242")
+ASF_API_URL = os.getenv("ASF_API_URL", "http://127.0.0.1:1242")
 ASF_API_KEY = os.getenv("ASF_API_KEY")
 
 # Проверка обязательных переменных
