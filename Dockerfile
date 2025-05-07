@@ -21,7 +21,8 @@ RUN wget https://github.com/JustArchiNET/ArchiSteamFarm/releases/download/5.5.0.
 
 # Copy the bot and configuration files into the container
 COPY main.py /app/
-COPY ASF.json ASF/config/ASF.json
+COPY ASF.json /app/ASF/config/ASF.json
+
 
 # Set the proper permissions
 RUN chmod +x /app/ASF/ArchiSteamFarm \
