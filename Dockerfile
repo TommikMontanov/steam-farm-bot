@@ -22,10 +22,10 @@ RUN pip3 install aiogram aiohttp
 # Устанавливаем рабочую директорию
 WORKDIR /app
 
-# Скачиваем и распаковываем ASF
-RUN wget https://github.com/JustArchiNET/ArchiSteamFarm/releases/download/5.5.0.11/ASF-linux-x64.zip \
-    && unzip ASF-linux-x64.zip -d ASF \
-    && rm ASF-linux-x64.zip
+# Скачиваем и распаковываем ASF (используем ASF-generic.zip)
+RUN wget https://github.com/JustArchiNET/ArchiSteamFarm/releases/download/5.5.0.11/ASF-generic.zip \
+    && unzip ASF-generic.zip -d ASF \
+    && rm ASF-generic.zip
 
 # Проверяем содержимое директории ASF
 RUN ls -la /app/ASF/ && test -f /app/ASF/ArchiSteamFarm.dll && echo "ArchiSteamFarm.dll exists" || { echo "ArchiSteamFarm.dll not found"; exit 1; }
