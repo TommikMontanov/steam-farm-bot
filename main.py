@@ -74,18 +74,20 @@ async def asf_request(endpoint, method="GET", data=None):
                 async with session.post(url, json=data, headers=headers) as resp:
                     logging.info(f"ASF API response status: {resp.status}")
                     if resp.status != 200:
-                        logging.error(f"ASF API error: {resp.status}, message={await resp.text()}")
-                        return None
+                        text = await resp.text()
+                        logging.error(f"ASF API error: {resp.status}, message={text}")
+                        return {"Success": False, "Message": text}
                     return await resp.json()
             async with session.get(url, headers=headers) as resp:
                 logging.info(f"ASF API response status: {resp.status}")
                 if resp.status != 200:
-                    logging.error(f"ASF API error: {resp.status}, message={await resp.text()}")
-                    return None
+                    text = await resp.text()
+                    logging.error(f"ASF API error: {resp.status}, message={text}")
+                    return {"Success": False, "Message": text}
                 return await resp.json()
         except Exception as e:
             logging.error(f"ASF API error: {e}, url={url}")
-            return None
+            return {"Success": False, "Message": str(e)}
 
 # Функция ожидания готовности ASF API
 async def wait_for_asf():
@@ -97,7 +99,8 @@ async def wait_for_asf():
             async with aiohttp.ClientSession() as session:
                 async with session.get(f"{ASF_API_URL}/Api", headers={"Authentication": ASF_API_KEY}) as resp:
                     logging.info(f"ASF API responded with status {resp.status}")
-                    return
+                    if resp.status == 200:
+                        return
         except aiohttp.ClientConnectionError as e:
             logging.warning(f"Waiting for ASF API: {e}")
         except Exception as e:
@@ -177,15 +180,14 @@ async def process_registration(message: types.Message):
         if steamguard_code.lower() != "нет":
             bot_config["TwoFactorCode"] = steamguard_code
 
-        # Отправляем конфигурацию в ASF
+        # Отправляем команду !addbot в ASF
         data = {
-            "BotName": bot_name,
-            "Config": bot_config
+            "Command": f"!addbot {bot_name} {json.dumps(bot_config)}"
         }
-        result = await asf_request(f"Bot/{bot_name}", method="POST", data=data)
+        result = await asf_request("Api/Command", method="POST", data=data)
         if result and result.get("Success"):
             # Получаем Steam ID после успешной регистрации
-            bot_info = await asf_request(f"Bot/{bot_name}")
+            bot_info = await asf_request(f"Api/Bot/{bot_name}")
             if bot_info and bot_info.get("Success"):
                 steam_id = bot_info.get("Result", {}).get(bot_name, {}).get("SteamID")
                 if steam_id:
@@ -199,12 +201,16 @@ async def process_registration(message: types.Message):
                     conn.commit()
                     conn.close()
                     await message.answer(f"Регистрация успешна! Steam ID: {steam_id}. Теперь выбери игры с помощью /select_games!")
+                    del registration_data[user_id]
+                    logging.info(f"Регистрация завершена для пользователя {user_id}")
                 else:
                     logging.error(f"Не удалось получить Steam ID для {bot_name}")
                     await message.answer("Не удалось получить Steam ID. Проверь настройки ASF.")
+                    del registration_data[user_id]
             else:
-                logging.error(f"Ошибка получения данных бота {bot_name}")
+                logging.error(f"Ошибка получения данных бота {bot_name}: {bot_info}")
                 await message.answer("Ошибка при получении данных бота. Проверь ASF.")
+                del registration_data[user_id]
         else:
             error_msg = result.get("Message", "Неизвестная ошибка") if result else "Ошибка связи с ASF"
             logging.error(f"Ошибка регистрации для {user_id}: {error_msg}")
@@ -212,11 +218,9 @@ async def process_registration(message: types.Message):
             if "Steam Guard" in error_msg:
                 registration_data[user_id]["step"] = "steamguard"
                 await message.answer("Введи новый код Steam Guard:")
-                return
-
-        # Очищаем временные данные
-        del registration_data[user_id]
-        logging.info(f"Регистрация завершена для пользователя {user_id}")
+            else:
+                del registration_data[user_id]
+            return
 
 # Обработчик команды /start_farm
 @dp.message(Command("start_farm"))
@@ -250,7 +254,7 @@ async def cmd_start_farm(message: types.Message):
     data = {
         "Command": f"!start {bot_name} {selected_games}"
     }
-    result = await asf_request("Command", method="POST", data=data)
+    result = await asf_request("Api/Command", method="POST", data=data)
     if result and result.get("Success"):
         cursor.execute("UPDATE users SET farming = ? WHERE user_id = ?", (True, user_id))
         conn.commit()
