@@ -12,8 +12,8 @@ import logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 # Получение переменных окружения
-API_TOKEN = os.getenv("BOT_TOKEN")
-ASF_API_URL = os.getenv("ASF_API_URL", "http://localhost:1242/ASF")
+API_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+ASF_API_URL = os.getenv("ASF_API_URL", "[invalid url, do not cite])
 ASF_API_KEY = os.getenv("ASF_API_KEY")
 
 # Проверка обязательных переменных
@@ -72,6 +72,25 @@ async def asf_request(endpoint, method="GET", data=None):
         except Exception as e:
             logging.error(f"ASF API error: {e}")
             return None
+
+# Функция ожидания готовности ASF API
+async def wait_for_asf():
+    max_attempts = 10
+    attempt = 0
+    while attempt < max_attempts:
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(f"{ASF_API_URL}/Api") as resp:
+                    logging.info(f"ASF API ответил с кодом {resp.status}")
+                    return
+        except aiohttp.ClientConnectionError as e:
+            logging.warning(f"Ожидание ASF API: {e}")
+        except Exception as e:
+            logging.error(f"Неожиданная ошибка: {e}")
+            return
+        attempt += 1
+        await asyncio.sleep(5)
+    raise RuntimeError("ASF API не стал доступен вовремя")
 
 # Обработчик команды /start
 @dp.message(Command("start"))
@@ -228,6 +247,7 @@ async def cmd_start_farm(message: types.Message):
 # Запуск бота
 async def main():
     logging.info("Запуск бота...")
+    await wait_for_asf()
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
