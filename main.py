@@ -61,7 +61,11 @@ def get_main_menu():
 
 # Функция для отправки запроса к ASF API
 async def asf_request(endpoint, method="GET", data=None):
-    headers = {"Authentication": ASF_API_KEY, "Content-Type": "application/json"}
+    headers = {
+        "Authentication": ASF_API_KEY,
+        "Content-Type": "application/json",
+        "Accept": "application/json"
+    }
     url = f"{ASF_API_URL}/{endpoint}"
     logging.info(f"Sending {method} request to ASF API: {url}")
     async with aiohttp.ClientSession() as session:
@@ -69,12 +73,18 @@ async def asf_request(endpoint, method="GET", data=None):
             if method == "POST":
                 async with session.post(url, json=data, headers=headers) as resp:
                     logging.info(f"ASF API response status: {resp.status}")
+                    if resp.status != 200:
+                        logging.error(f"ASF API error: {resp.status}, message={await resp.text()}")
+                        return None
                     return await resp.json()
             async with session.get(url, headers=headers) as resp:
                 logging.info(f"ASF API response status: {resp.status}")
+                if resp.status != 200:
+                    logging.error(f"ASF API error: {resp.status}, message={await resp.text()}")
+                    return None
                 return await resp.json()
         except Exception as e:
-            logging.error(f"ASF API error: {e}")
+            logging.error(f"ASF API error: {e}, url={url}")
             return None
 
 # Функция ожидания готовности ASF API
@@ -85,7 +95,7 @@ async def wait_for_asf():
         logging.info(f"Attempt {attempt + 1}/{max_attempts} to connect to ASF API")
         try:
             async with aiohttp.ClientSession() as session:
-                async with session.get(f"{ASF_API_URL}/Api") as resp:
+                async with session.get(f"{ASF_API_URL}/Api", headers={"Authentication": ASF_API_KEY}) as resp:
                     logging.info(f"ASF API responded with status {resp.status}")
                     return
         except aiohttp.ClientConnectionError as e:
@@ -169,15 +179,15 @@ async def process_registration(message: types.Message):
 
         # Отправляем конфигурацию в ASF
         data = {
-            "Command": f"!addbot {bot_name}",
+            "BotName": bot_name,
             "Config": bot_config
         }
-        result = await asf_request("Bot", method="POST", data=data)
+        result = await asf_request(f"Bot/{bot_name}", method="POST", data=data)
         if result and result.get("Success"):
             # Получаем Steam ID после успешной регистрации
             bot_info = await asf_request(f"Bot/{bot_name}")
             if bot_info and bot_info.get("Success"):
-                steam_id = bot_info.get("Result", {}).get("SteamID")
+                steam_id = bot_info.get("Result", {}).get(bot_name, {}).get("SteamID")
                 if steam_id:
                     conn = sqlite3.connect("users.db")
                     cursor = conn.cursor()
