@@ -1,0 +1,9 @@
+{
+  "AutoRestart": true,
+  "CommandPrefix": "!",
+  "ConfirmationsLimiterDelay": 10,
+  "IPC": true,
+  "IPCPassword": null,
+  "Statistics": false,
+  "UpdateChannel": 0
+}
