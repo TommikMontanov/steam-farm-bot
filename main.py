@@ -2,6 +2,7 @@ import asyncio
 import sqlite3
 import aiohttp
 import os
+import json
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
@@ -11,17 +12,20 @@ import logging
 logging.basicConfig(level=logging.INFO)
 
 # Получение переменных окружения
-API_TOKEN = os.getenv("BOT_TOKEN")  # Токен Telegram-бота
-ASF_API_URL = os.getenv("ASF_API_URL", "http://localhost:1242/ASF")  # URL ASF IPC
-ASF_API_KEY = os.getenv("ASF_API_KEY")  # API ключ ASF
+API_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+ASF_API_URL = os.getenv("ASF_API_URL", "http://localhost:1242/ASF")
+ASF_API_KEY = os.getenv("ASF_API_KEY")
 
 # Проверка обязательных переменных
 if not API_TOKEN or not ASF_API_KEY:
-    raise ValueError("TELEGRAM_BOT_TOKEN и ASF_API_KEY должны быть заданы в переменных окружения")
+    raise ValueError("TELEGRAM_BOT_TOKEN и ASF_API_KEY должны быть заданы")
 
 # Инициализация бота и диспетчера
 bot = Bot(token=API_TOKEN)
 dp = Dispatcher()
+
+# Временное хранилище для регистрации
+registration_data = {}
 
 # Инициализация базы данных SQLite
 def init_db():
@@ -32,7 +36,8 @@ def init_db():
             user_id INTEGER PRIMARY KEY,
             steam_id TEXT,
             farming BOOLEAN,
-            selected_games TEXT
+            selected_games TEXT,
+            bot_name TEXT
         )
     """)
     conn.commit()
@@ -42,11 +47,16 @@ init_db()
 
 # Создание клавиатуры
 def get_main_menu():
-    keyboard = ReplyKeyboardMarkup(resize_keyboard=True)
-    keyboard.add(KeyboardButton("/start_farm"))
-    keyboard.add(KeyboardButton("/stop_farm"))
-    keyboard.add(KeyboardButton("/select_games"))
-    keyboard.add(KeyboardButton("/status"))
+    keyboard = ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text="/register")],
+            [KeyboardButton(text="/start_farm")],
+            [KeyboardButton(text="/stop_farm")],
+            [KeyboardButton(text="/select_games")],
+            [KeyboardButton(text="/status")]
+        ],
+        resize_keyboard=True
+    )
     return keyboard
 
 # Функция для отправки запроса к ASF API
@@ -68,6 +78,7 @@ async def asf_request(endpoint, method="GET", data=None):
 async def cmd_start(message: types.Message):
     await message.answer(
         "Привет! Я бот для фарма часов в Steam. Используй команды:\n"
+        "/register - Зарегистрировать Steam-аккаунт\n"
         "/start_farm - Начать фарм\n"
         "/stop_farm - Остановить фарм\n"
         "/select_games - Выбрать игры\n"
@@ -75,22 +86,104 @@ async def cmd_start(message: types.Message):
         reply_markup=get_main_menu()
     )
 
+# Обработчик команды /register
+@dp.message(Command("register"))
+async def cmd_register(message: types.Message):
+    user_id = message.from_user.id
+    registration_data[user_id] = {"step": "login"}
+    await message.answer("Введи свой Steam логин:")
+
+# Обработчик шагов регистрации
+async def process_registration(message: types.Message):
+    user_id = message.from_user.id
+    if user_id not in registration_data:
+        await message.answer("Начни регистрацию с /register!")
+        return
+
+    step = registration_data[user_id]["step"]
+    if step == "login":
+        registration_data[user_id]["login"] = message.text.strip()
+        registration_data[user_id]["step"] = "password"
+        await message.answer("Введи свой Steam пароль:")
+    elif step == "password":
+        registration_data[user_id]["password"] = message.text.strip()
+        registration_data[user_id]["step"] = "steamguard"
+        await message.answer(
+            "Если у тебя включен Steam Guard, введи код из письма или мобильного приложения. "
+            "Если Steam Guard отключен, напиши 'нет':"
+        )
+    elif step == "steamguard":
+        steamguard_code = message.text.strip()
+        login = registration_data[user_id]["login"]
+        password = registration_data[user_id]["password"]
+        bot_name = f"Bot_{user_id}"
+
+        # Создаем конфигурацию для ASF
+        bot_config = {
+            "Enabled": True,
+            "SteamLogin": login,
+            "SteamPassword": password,
+            "SteamUserPermissions": {},
+            "FarmingPreferences": 0,
+            "IsBotAccount": True,
+            "OnlineStatus": 1
+        }
+        if steamguard_code.lower() != "нет":
+            bot_config["TwoFactorCode"] = steamguard_code
+
+        # Отправляем конфигурацию в ASF
+        data = {
+            "Command": f"!addbot {bot_name}",
+            "Config": bot_config
+        }
+        result = await asf_request("Bot", method="POST", data=data)
+        if result and result.get("Success"):
+            # Получаем Steam ID после успешной регистрации
+            bot_info = await asf_request(f"Bot/{bot_name}")
+            if bot_info and bot_info.get("Success"):
+                steam_id = bot_info.get("Result", {}).get("SteamID")
+                if steam_id:
+                    conn = sqlite3.connect("users.db")
+                    cursor = conn.cursor()
+                    cursor.execute(
+                        "INSERT OR REPLACE INTO users (user_id, steam_id, farming, selected_games, bot_name) "
+                        "VALUES (?, ?, ?, ?, ?)",
+                        (user_id, steam_id, False, "", bot_name)
+                    )
+                    conn.commit()
+                    conn.close()
+                    await message.answer(f"Регистрация успешна! Steam ID: {steam_id}. Теперь выбери игры с помощью /select_games!")
+                else:
+                    await message.answer("Не удалось получить Steam ID. Проверь настройки ASF.")
+            else:
+                await message.answer("Ошибка при получении данных бота. Проверь ASF.")
+        else:
+            error_msg = result.get("Message", "Неизвестная ошибка") if result else "Ошибка связи с ASF"
+            await message.answer(f"Ошибка регистрации: {error_msg}. Попробуй снова или проверь Steam Guard.")
+            if "Steam Guard" in error_msg:
+                registration_data[user_id]["step"] = "steamguard"
+                await message.answer("Введи новый код Steam Guard:")
+                return
+
+        # Очищаем временные данные
+        del registration_data[user_id]
+        dp.message_handlers.unregister(process_registration)
+
 # Обработчик команды /start_farm
 @dp.message(Command("start_farm"))
 async def cmd_start_farm(message: types.Message):
     user_id = message.from_user.id
     conn = sqlite3.connect("users.db")
     cursor = conn.cursor()
-    cursor.execute("SELECT steam_id, selected_games FROM users WHERE user_id = ?", (user_id,))
+    cursor.execute("SELECT steam_id, selected_games, bot_name FROM users WHERE user_id = ?", (user_id,))
     user = cursor.fetchone()
 
     if not user:
-        await message.answer("Пожалуйста, укажи свой Steam ID (например, 76561198000000000):")
-        dp.register_message_handler(process_steam_id, user_id=user_id)
+        await message.answer("Сначала зарегистрируйся с помощью /register!")
         conn.close()
         return
 
-    steam_id, selected_games = user
+    steam_id, selected_games, bot_name = user
     if not selected_games:
         await message.answer("Сначала выбери игры для фарма с помощью /select_games!")
         conn.close()
@@ -105,139 +198,16 @@ async def cmd_start_farm(message: types.Message):
 
     # Запускаем фарм через ASF
     data = {
-        "Command": f"!start {steam_id} {selected_games}"
+        "Command": f"!start {bot_name} {selected_games}"
     }
     result = await asf_request("Command", method="POST", data=data)
     if result and result.get("Success"):
         cursor.execute("UPDATE users SET farming = ? WHERE user_id = ?", (True, user_id))
         conn.commit()
-        await message.answer(f"Фарм начат для Steam ID {steam_id} с играми: {selected_games}!")
+        await message.answer(f"Фарм начат для Steam ID {steam_id}!")
     else:
         await message.answer("Ошибка при запуске фарма. Проверь настройки ASF.")
     conn.close()
-
-# Обработчик ввода Steam ID
-async def process_steam_id(message: types.Message):
-    user_id = message.from_user.id
-    steam_id = message.text.strip()
-
-    # Проверка формата Steam ID
-    if not steam_id.isdigit() or len(steam_id) != 17:
-        await message.answer("Неверный формат Steam ID. Попробуй еще раз (17 цифр):")
-        return
-
-    conn = sqlite3.connect("users.db")
-    cursor = conn.cursor()
-    cursor.execute(
-        "INSERT OR REPLACE INTO users (user_id, steam_id, farming, selected_games) VALUES (?, ?, ?, ?)",
-        (user_id, steam_id, False, "")
-    )
-    conn.commit()
-    conn.close()
-    await message.answer(f"Steam ID сохранен: {steam_id}. Теперь выбери игры с помощью /select_games!")
-    dp.message_handlers.unregister(process_steam_id)
-
-# Обработчик команды /stop_farm
-@dp.message(Command("stop_farm"))
-async def cmd_stop_farm(message: types.Message):
-    user_id = message.from_user.id
-    conn = sqlite3.connect("users.db")
-    cursor = conn.cursor()
-    cursor.execute("SELECT steam_id, farming FROM users WHERE user_id = ?", (user_id,))
-    user = cursor.fetchone()
-
-    if not user or not user[1]:
-        await message.answer("Фарм не запущен!")
-        conn.close()
-        return
-
-    steam_id = user[0]
-    # Останавливаем фарм через ASF
-    data = {
-        "Command": f"!stop {steam_id}"
-    }
-    result = await asf_request("Command", method="POST", data=data)
-    if result and result.get("Success"):
-        cursor.execute("UPDATE users SET farming = ? WHERE user_id = ?", (False, user_id))
-        conn.commit()
-        await message.answer("Фарм остановлен!")
-    else:
-        await message.answer("Ошибка при остановке фарма. Проверь настройки ASF.")
-    conn.close()
-
-# Обработчик команды /select_games
-@dp.message(Command("select_games"))
-async def cmd_select_games(message: types.Message):
-    user_id = message.from_user.id
-    conn = sqlite3.connect("users.db")
-    cursor = conn.cursor()
-    cursor.execute("SELECT steam_id FROM users WHERE user_id = ?", (user_id,))
-    user = cursor.fetchone()
-
-    if not user:
-        await message.answer("Сначала укажи Steam ID с помощью /start_farm!")
-        conn.close()
-        return
-
-    steam_id = user[0]
-    # Получаем список доступных игр через ASF
-    result = await asf_request(f"Bot/{steam_id}/Games")
-    if not result or not result.get("Success"):
-        await message.answer("Не удалось получить список игр. Проверь ASF.")
-        conn.close()
-        return
-
-    games = result.get("Result", {}).get("Games", {})
-    if not games:
-        await message.answer("Нет доступных игр для фарма.")
-        conn.close()
-        return
-
-    # Формируем список игр (AppID)
-    game_list = [f"{app_id}" for app_id in games.keys()]
-    await message.answer(
-        f"Доступные игры (AppID): {', '.join(game_list)}\n"
-        "Введи AppID игр для фарма через запятую (например, 730,440):"
-    )
-    dp.register_message_handler(process_games_selection, user_id=user_id)
-    conn.close()
-
-# Обработчик выбора игр
-async def process_games_selection(message: types.Message):
-    user_id = message.from_user.id
-    games = message.text.strip().split(",")
-    games = [game.strip() for game in games if game.strip().isdigit()]
-
-    if not games:
-        await message.answer("Неверный формат. Введи AppID игр через запятую.")
-        return
-
-    conn = sqlite3.connect("users.db")
-    cursor = conn.cursor()
-    cursor.execute("UPDATE users SET selected_games = ? WHERE user_id = ?", (",".join(games), user_id))
-    conn.commit()
-    conn.close()
-    await message.answer(f"Игры выбраны: {', '.join(games)}. Теперь используй /start_farm!")
-    dp.message_handlers.unregister(process_games_selection)
-
-# Обработчик команды /status
-@dp.message(Command("status"))
-async def cmd_status(message: types.Message):
-    user_id = message.from_user.id
-    conn = sqlite3.connect("users.db")
-    cursor = conn.cursor()
-    cursor.execute("SELECT steam_id, farming, selected_games FROM users WHERE user_id = ?", (user_id,))
-    user = cursor.fetchone()
-    conn.close()
-
-    if not user:
-        await message.answer("Ты еще не начинал фарм. Используй /start_farm!")
-        return
-
-    steam_id, farming, selected_games = user
-    status = "активен" if farming else "остановлен"
-    games = selected_games or "не выбраны"
-    await message.answer(f"Статус фарма: {status}\nSteam ID: {steam_id}\nИгры: {games}")
 
 # Запуск бота
 async def main():
