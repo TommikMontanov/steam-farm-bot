@@ -42,5 +42,5 @@ RUN chmod -R 777 /app/ASF/config/
 # Проверяем, что порт 1242 открыт (для отладки)
 RUN echo "Checking port 1242 status..." && netstat -tuln | grep 1242 || echo "Port 1242 not open"
 
-# Запускаем ASF и бота
-CMD sh -c "dotnet /app/ASF/ArchiSteamFarm.dll & sleep 15 && netstat -tuln | grep 1242 && python3 /app/main.py"
+# Запускаем ASF и бота с отладкой
+CMD sh -c "dotnet /app/ASF/ArchiSteamFarm.dll --verbose & sleep 20 && netstat -tuln | grep 1242 && python3 /app/main.py"
