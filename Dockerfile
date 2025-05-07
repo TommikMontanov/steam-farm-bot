@@ -53,4 +53,4 @@ RUN cat /app/ASF/config/ASF.json
 USER asfuser
 
 # Запускаем ASF и бота
-CMD sh -c "dotnet /app/ASF/ArchiSteamFarm.dll & sleep 30 && netstat -tuln | grep 1242 || echo 'Port 1242 not open' && python3 /app/main.py"
+CMD sh -c "dotnet /app/ASF/ArchiSteamFarm.dll & sleep 60 && netstat -tuln | grep 1242 || echo 'Port 1242 not open' && python3 /app/main.py"
