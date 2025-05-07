@@ -1,9 +1,0 @@
-{
-  "Enabled": true,
-  "SteamLogin": "YOUR_STEAM_LOGIN",
-  "SteamPassword": "YOUR_STEAM_PASSWORD",
-  "SteamUserPermissions": {},
-  "FarmingPreferences": 0,
-  "IsBotAccount": true,
-  "OnlineStatus": 1
-}
