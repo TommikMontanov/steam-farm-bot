@@ -5,8 +5,12 @@
   "CurrentCulture": null,
   "FarmingDelay": 15,
   "Headless": true,
+  "AutoRestart": true,
+  "Headless": true,
   "IPC": true,
-  "IPCPassword": null,
+  "IPCPassword": "mysecret123",
+  "Debug": true
+  "IPC": true,
   "Debug": true
   "LoginLimiterDelay": 10,
   "MaxFarmingTime": 10,
