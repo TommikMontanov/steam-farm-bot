@@ -12,7 +12,7 @@ import logging
 logging.basicConfig(level=logging.INFO)
 
 # Получение переменных окружения
-API_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+API_TOKEN = os.getenv("BOT_TOKEN")
 ASF_API_URL = os.getenv("ASF_API_URL", "http://localhost:1242/ASF")
 ASF_API_KEY = os.getenv("ASF_API_KEY")
 
