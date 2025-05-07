@@ -1,21 +1,17 @@
-from mcr.microsoft.com/dotnet/runtime:8.0
-RUN wget https://github.com/JustArchiNET/ArchiSteamFarm/releases/latest/download/ASF-generic.zip 
-&& [ -f ASF-generic.zip ] || exit 1 
-&& unzip ASF-generic.zip -d ASF 
-&& rm ASF-generic.zip
-RUN apt-get update && apt-get install -y 
+run apt-get update && apt-get install -y 
 python3 
 python3-pip 
 sqlite3 
 unzip 
 wget 
 && rm -rf /var/lib/apt/lists/*
-RUN pip3 install aiogram aiohttp
-WORKDIR /app RUN wget https://github.com/JustArchiNET/ArchiSteamFarm/releases/latest/download/ASF-generic.zip 
+pip3 install aiogram aiohttp
+workdir /app
+run wget https://github.com/JustArchiNET/ArchiSteamFarm/releases/download/5.5.0.11/ASF-generic.zip 
 && unzip ASF-generic.zip -d ASF 
 && rm ASF-generic.zip
-COPY telegram_bot.py /app/
-COPY ASF.json /app/ASF/config/ COPY Bot.json /app/ASF/config/
-RUN chmod +x /app/ASF/ArchiSteamFarm 
+copy telegram_bot.py /app/
+copy ASF.json /app/ASF/config/
+run chmod +x /app/ASF/ArchiSteamFarm 
 && chmod -R 777 /app/ASF/config/
-CMD /app/ASF/ArchiSteamFarm & python3 /app/telegram_bot.py
+cmd /app/ASF/ArchiSteamFarm & python3 /app/telegram_bot.py
