@@ -17,8 +17,8 @@ ASF_API_URL = os.getenv("ASF_API_URL")
 ASF_API_KEY = os.getenv("ASF_API_KEY")
 
 # Проверка обязательных переменных
-if not API_TOKEN or not ASF_API_KEY:
-    raise ValueError("TELEGRAM_BOT_TOKEN и ASF_API_KEY должны быть заданы")
+if not API_TOKEN or not ASF_API_URL or not ASF_API_KEY:
+    raise ValueError(f"Missing environment variables: BOT_TOKEN={API_TOKEN}, ASF_API_URL={ASF_API_URL}, ASF_API_KEY={ASF_API_KEY}")
 
 # Инициализация бота и диспетчера
 bot = Bot(token=API_TOKEN)
@@ -85,30 +85,39 @@ async def asf_request(endpoint, method="GET", data=None):
                     logging.error(f"ASF API error: {resp.status}, message={text}")
                     return {"Success": False, "Message": text}
                 return await resp.json()
+        except aiohttp.ClientConnectionError as e:
+            logging.error(f"ASF API connection error: {e}, url={url}")
+            return {"Success": False, "Message": f"Connection error: {str(e)}"}
         except Exception as e:
-            logging.error(f"ASF API error: {e}, url={url}")
-            return {"Success": False, "Message": str(e)}
+            logging.error(f"ASF API unexpected error: {e}, url={url}")
+            return {"Success": False, "Message": f"Unexpected error: {str(e)}"}
 
 # Функция ожидания готовности ASF API
 async def wait_for_asf():
-    max_attempts = 15
+    max_attempts = 30  # Увеличено с 15 до 30
+    url = f"{ASF_API_URL}/Api"
+    headers = {"Authentication": ASF_API_KEY}
+    logging.info(f"Attempting to connect to ASF API at {url} with ASF_API_KEY={ASF_API_KEY}")
     attempt = 0
     while attempt < max_attempts:
         logging.info(f"Attempt {attempt + 1}/{max_attempts} to connect to ASF API")
         try:
             async with aiohttp.ClientSession() as session:
-                async with session.get(f"{ASF_API_URL}/Api", headers={"Authentication": ASF_API_KEY}) as resp:
+                async with session.get(url, headers=headers) as resp:
                     logging.info(f"ASF API responded with status {resp.status}")
                     if resp.status == 200:
+                        logging.info("ASF API is available")
                         return
+                    else:
+                        text = await resp.text()
+                        logging.error(f"ASF API returned status {resp.status}: {text}")
         except aiohttp.ClientConnectionError as e:
-            logging.warning(f"Waiting for ASF API: {e}")
+            logging.warning(f"Connection error: {e}")
         except Exception as e:
             logging.error(f"Unexpected error: {e}")
-            return
         attempt += 1
-        await asyncio.sleep(10)
-    raise RuntimeError("ASF API did not become available in time")
+        await asyncio.sleep(5)  # Уменьшено с 10 до 5 секунд
+    raise RuntimeError(f"ASF API did not become available after {max_attempts} attempts")
 
 # Обработчик команды /start
 @dp.message(Command("start"))
@@ -260,7 +269,8 @@ async def cmd_start_farm(message: types.Message):
         conn.commit()
         await message.answer(f"Фарм начат для Steam ID {steam_id}!")
     else:
-        await message.answer("Ошибка при запуске фарма. Проверь настройки ASF.")
+        error_msg = result.get("Message", "Неизвестная ошибка") if result else "Ошибка связи с ASF"
+        await message.answer(f"Ошибка при запуске фарма: {error_msg}.")
     conn.close()
 
 # Запуск бота
