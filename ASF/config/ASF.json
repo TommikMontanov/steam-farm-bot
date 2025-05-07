@@ -1,11 +1,12 @@
 {
-  "AutoRestart": true,
-  "CommandPrefix": "!",
-  "ConfirmationsLimiterDelay": 10,
-  "IPC": true,
-  "IPCPassword": "skoupmanter",
-  "IPCHost": "127.0.0.1",
+  "IPCHost": "0.0.0.0",
   "IPCPort": 1242,
-  "Statistics": false,
-  "UpdateChannel": 0
+  "IPCPassword": null,
+  "Kestrel": {
+    "Endpoints": {
+      "HTTP": {
+        "Url": "http://0.0.0.0:1242"
+      }
+    }
+  }
 }
