@@ -1,12 +1,17 @@
 {
-  "IPCHost": "0.0.0.0",
-  "IPCPort": 1242,
+  "AutoRestart": true,
+  "ConfirmationsLimiterDelay": 10,
+  "ConnectionTimeout": 60,
+  "CurrentCulture": null,
+  "Debug": false,
+  "FarmingDelay": 15,
+  "Headless": true,
+  "IPC": true,
   "IPCPassword": null,
-  "Kestrel": {
-    "Endpoints": {
-      "HTTP": {
-        "Url": "http://0.0.0.0:1242"
-      }
-    }
-  }
+  "LoginLimiterDelay": 10,
+  "MaxFarmingTime": 10,
+  "OptimizationMode": 0,
+  "Statistics": true,
+  "SteamOwnerID": 0,
+  "UpdateChannel": 0
 }
