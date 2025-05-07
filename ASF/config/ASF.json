@@ -4,7 +4,7 @@
   "ConfirmationsLimiterDelay": 10,
   "IPC": true,
   "IPCPassword": "skoupmanter",
-  "IPCHost": "0.0.0.0",
+  "IPCHost": "127.0.0.1",
   "IPCPort": 1242,
   "Statistics": false,
   "UpdateChannel": 0
