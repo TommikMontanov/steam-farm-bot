@@ -1,40 +1,49 @@
-# Use an official Python image as the base image
 FROM python:3.9-slim
 
-# Set the working directory in the container
-WORKDIR /app
-
-# Update package list and install necessary packages
+# Устанавливаем необходимые пакеты
 RUN apt-get update && apt-get install -y \
     sqlite3 \
     unzip \
     wget \
+    libicu-dev \
+    net-tools \
     gnupg \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-# Install .NET 6 runtime
+# Устанавливаем .NET runtime
 RUN wget https://packages.microsoft.com/config/debian/10/packages-microsoft-prod.deb -O packages-microsoft-prod.deb \
     && dpkg -i packages-microsoft-prod.deb \
     && rm packages-microsoft-prod.deb \
-    && apt-get update && apt-get install -y dotnet-runtime-6.0 \
+    && apt-get update \
+    && apt-get install -y dotnet-runtime-6.0 \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Python dependencies
+# Устанавливаем Python-библиотеки
 RUN pip3 install aiogram aiohttp
 
-# Download and extract ASF
+# Устанавливаем рабочую директорию
+WORKDIR /app
+
+# Скачиваем и распаковываем ASF
 RUN wget https://github.com/JustArchiNET/ArchiSteamFarm/releases/download/5.5.0.11/ASF-linux-x64.zip \
     && unzip ASF-linux-x64.zip -d ASF \
     && rm ASF-linux-x64.zip
 
-# Copy the bot and configuration files into the container
+# Проверяем содержимое директории ASF
+RUN ls -la /app/ASF/
+
+# Копируем код бота
 COPY main.py /app/
+
+# Копируем конфигурацию ASF
 COPY ASF/config/ASF.json /app/ASF/config/ASF.json
 
-# Set the proper permissions
-RUN chmod +x /app/ASF/ArchiSteamFarm \
-    && chmod -R 777 /app/ASF/config/
+# Даем права на запись в директорию конфигурации
+RUN chmod -R 777 /app/ASF/config/
 
-# Set the command to run the bot and ASF
-CMD sh -c "dotnet /app/ASF/ArchiSteamFarm.dll & sleep 5 && python3 /app/main.py"
+# Проверяем, что порт 1242 открыт (для отладки)
+RUN echo "Checking port 1242 status..." && netstat -tuln | grep 1242 || echo "Port 1242 not open"
+
+# Запускаем ASF и бота
+CMD sh -c "dotnet /app/ASF/ArchiSteamFarm.dll & sleep 10 && netstat -tuln | grep 1242 && python3 /app/main.py"
