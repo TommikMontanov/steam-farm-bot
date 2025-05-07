@@ -13,7 +13,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 
 # Получение переменных окружения
 API_TOKEN = os.getenv("BOT_TOKEN")
-ASF_API_URL = os.getenv("ASF_API_URL", "[invalid url, do not cite])
+ASF_API_URL = os.getenv("ASF_API_URL", "http://0.0.0.0:1242")
 ASF_API_KEY = os.getenv("ASF_API_KEY")
 
 # Проверка обязательных переменных
@@ -62,12 +62,16 @@ def get_main_menu():
 # Функция для отправки запроса к ASF API
 async def asf_request(endpoint, method="GET", data=None):
     headers = {"Authentication": ASF_API_KEY, "Content-Type": "application/json"}
+    url = f"{ASF_API_URL}/{endpoint}"
+    logging.info(f"Sending {method} request to ASF API: {url}")
     async with aiohttp.ClientSession() as session:
         try:
             if method == "POST":
-                async with session.post(f"{ASF_API_URL}/{endpoint}", json=data, headers=headers) as resp:
+                async with session.post(url, json=data, headers=headers) as resp:
+                    logging.info(f"ASF API response status: {resp.status}")
                     return await resp.json()
-            async with session.get(f"{ASF_API_URL}/{endpoint}", headers=headers) as resp:
+            async with session.get(url, headers=headers) as resp:
+                logging.info(f"ASF API response status: {resp.status}")
                 return await resp.json()
         except Exception as e:
             logging.error(f"ASF API error: {e}")
@@ -75,22 +79,23 @@ async def asf_request(endpoint, method="GET", data=None):
 
 # Функция ожидания готовности ASF API
 async def wait_for_asf():
-    max_attempts = 10
+    max_attempts = 15
     attempt = 0
     while attempt < max_attempts:
+        logging.info(f"Attempt {attempt + 1}/{max_attempts} to connect to ASF API")
         try:
             async with aiohttp.ClientSession() as session:
                 async with session.get(f"{ASF_API_URL}/Api") as resp:
-                    logging.info(f"ASF API ответил с кодом {resp.status}")
+                    logging.info(f"ASF API responded with status {resp.status}")
                     return
         except aiohttp.ClientConnectionError as e:
-            logging.warning(f"Ожидание ASF API: {e}")
+            logging.warning(f"Waiting for ASF API: {e}")
         except Exception as e:
-            logging.error(f"Неожиданная ошибка: {e}")
+            logging.error(f"Unexpected error: {e}")
             return
         attempt += 1
-        await asyncio.sleep(5)
-    raise RuntimeError("ASF API не стал доступен вовремя")
+        await asyncio.sleep(10)
+    raise RuntimeError("ASF API did not become available in time")
 
 # Обработчик команды /start
 @dp.message(Command("start"))
