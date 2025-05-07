@@ -19,28 +19,38 @@ RUN wget https://packages.microsoft.com/config/debian/10/packages-microsoft-prod
 # Устанавливаем Python-библиотеки
 RUN pip3 install aiogram aiohttp
 
+# Создаем непривилегированного пользователя
+RUN useradd -ms /bin/bash asfuser
+
 # Устанавливаем рабочую директорию
 WORKDIR /app
+RUN chown asfuser:asfuser /app
 
 # Скачиваем и распаковываем ASF (используем ASF-generic.zip)
 RUN wget https://github.com/JustArchiNET/ArchiSteamFarm/releases/download/5.5.0.11/ASF-generic.zip \
     && unzip ASF-generic.zip -d ASF \
-    && rm ASF-generic.zip
+    && rm ASF-generic.zip \
+    && chown -R asfuser:asfuser /app/ASF
 
 # Проверяем содержимое директории ASF
 RUN ls -la /app/ASF/ && test -f /app/ASF/ArchiSteamFarm.dll && echo "ArchiSteamFarm.dll exists" || { echo "ArchiSteamFarm.dll not found"; exit 1; }
 
 # Копируем код бота
 COPY main.py /app/
+RUN chown asfuser:asfuser /app/main.py
 
 # Копируем конфигурацию ASF
 COPY ASF/config/ASF.json /app/ASF/config/ASF.json
+RUN chown -R asfuser:asfuser /app/ASF/config/
 
 # Даем права на запись в директорию конфигурации
 RUN chmod -R 777 /app/ASF/config/
 
-# Проверяем, что порт 1242 открыт (для отладки)
-RUN echo "Checking port 1242 status..." && netstat -tuln | grep 1242 || echo "Port 1242 not open"
+# Проверяем конфигурацию ASF
+RUN cat /app/ASF/config/ASF.json
 
-# Запускаем ASF и бота с отладкой
-CMD sh -c "dotnet /app/ASF/ArchiSteamFarm.dll --verbose & sleep 20 && netstat -tuln | grep 1242 && python3 /app/main.py"
+# Переключаемся на пользователя asfuser
+USER asfuser
+
+# Запускаем ASF и бота
+CMD sh -c "dotnet /app/ASF/ArchiSteamFarm.dll & sleep 30 && netstat -tuln | grep 1242 || echo 'Port 1242 not open' && python3 /app/main.py"
