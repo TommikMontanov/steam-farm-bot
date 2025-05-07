@@ -1,4 +1,11 @@
-  "SteamLogin": "логин",
-  "SteamPassword": "пароль",
-  "SteamParentalCode": "0000",
-  "UseLoginKeys": true
+{
+  "SteamLogin": "ваш_логин",
+  "SteamPassword": "ваш_пароль",
+  "Enabled": true,
+  "BotBehaviour": 0,
+  "SteamParentalCode": "1234",
+  "TwoFactorAuthentication": true
+  "SteamUserPermissions": {
+    "76561199395403030": 3
+  }
+}
