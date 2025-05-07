@@ -12,7 +12,7 @@ import logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 # Получение переменных окружения
-API_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+API_TOKEN = os.getenv("BOT_TOKEN")
 ASF_API_URL = os.getenv("ASF_API_URL", "[invalid url, do not cite])
 ASF_API_KEY = os.getenv("ASF_API_KEY")
 
