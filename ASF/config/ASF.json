@@ -3,7 +3,7 @@
   "CommandPrefix": "!",
   "ConfirmationsLimiterDelay": 10,
   "IPC": true,
-  "IPCPassword": skoupmanter,
+  "IPCPassword": "skoupmanter",
   "Statistics": false,
   "UpdateChannel": 0
 }
